@@ -24,7 +24,7 @@ The package is modular, allowing users to run individual steps or the entire pip
 ### Step 1. Convert movie file to a sequence of TIFFs
 ![image info](./images/image_1.png)
 
-run the script in the segmentation folder called "file_convert_x2tiff.py"
+run the script in the segmentation folder called "file_convert_and_viewer.py"
 A dialogue box opens up with 3 options.
 
 1. Select a single file to process
