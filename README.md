@@ -13,7 +13,7 @@ Key features of the software include:
 6. Final Quantification and Output: Produces detailed outputs including transcription site trajectories, spot and cluster coordinates, nascent RNA quantification, and visualization tools for validation.
 
 The package is modular, allowing users to run individual steps or the entire pipeline depending on their experimental design. It is intended for researchers studying gene expression dynamics at single-cell and single-molecule resolution.
-
+For more information, please refer to this [liveQuant Tutorial](https://rachel-kt.github.io/project/livequant/)
 ## Setting up the environment
 1. Create the environment from the yaml file:
 `conda env create -f liveQuant_092025_v3_2.yml`
@@ -49,4 +49,5 @@ If you want to use the viewer functionality click on the last option "View TIFF 
 ![image info](./images/image_5.png)
 
 The left side shows the 4-D movie whereas the right side shows a maximum intensity projection along the Z-axis.
+
 For further help please refer to this guidebook --> [liveQuant Tutorial](https://rachel-kt.github.io/project/livequant/)
