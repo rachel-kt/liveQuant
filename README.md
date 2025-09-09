@@ -49,4 +49,4 @@ If you want to use the viewer functionality click on the last option "View TIFF 
 ![image info](./images/image_5.png)
 
 The left side shows the 4-D movie whereas the right side shows a maximum intensity projection along the Z-axis.
-
+For further help please refer to this guidebook --> [liveQuant Tutorial](https://rachel-kt.github.io/project/livequant/)
