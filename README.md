@@ -19,7 +19,13 @@ Final Quantification and Output: Produces detailed outputs including transcripti
 
 The package is modular, allowing users to run individual steps or the entire pipeline depending on their experimental design. It is intended for researchers studying gene expression dynamics at single-cell and single-molecule resolution.
 
+## Setting up the environment
+1. Create the environment from the yaml file:
+`conda env create -f liveQuant_092025_v3_2.yml`
 
+2. Activate the new environment:
+`conda activate liveQuant`
+   
 ## Pre-processing of Raw Imaging Data:
 ### Step 1. Convert movie file to a sequence of TIFFs
 ![image info](./images/image_1.png)
