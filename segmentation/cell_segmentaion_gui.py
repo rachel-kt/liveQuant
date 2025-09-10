@@ -27,7 +27,7 @@ from bigfish.multistack import match_nuc_cell
 
 from cropFunctions import *
 from joblib import Parallel, delayed
-
+from tqdm import tqdm
 
 # -------------------- helper functions
 
@@ -61,7 +61,7 @@ def process_frame_mask(
         centroidLabelDF_pCorr (DataFrame): Corrected projection info.
         noNucleiFinal (ndarray): Final list of unique nucleus labels.
     """
-
+    print('running process frame mask')
     # Load mask path for frame t
     maskPathHome = os.path.join(tempmaskFolder, imageName.replace('.', '_')) + f"_t{timep:03}_cp_masks.png"
     if not os.path.isfile(maskPathHome):
@@ -128,13 +128,14 @@ def process_frame_mask(
 
 def crop_nuclei_by_projection(
     imageFile, timep, noNucleiA, centroidLabelDF_Projection,
-    moviePath, imageName, useTimeMaxProjection=False,
+    moviePath, useTimeMaxProjection=False,
     extensionMov='.tif', centroidListTPoint=None
 ):
     for nuclei in noNucleiA:
         sizeList = pd.DataFrame(
             centroidLabelDF_Projection[['label', 'sizex', 'sizey']], dtype=np.int64
         )
+        imageName = os.path.basename(os.path.normpath(moviePath))
         minr = centroidLabelDF_Projection.loc[centroidLabelDF_Projection['label'] == nuclei, 'minr'].values[0]
         minc = centroidLabelDF_Projection.loc[centroidLabelDF_Projection['label'] == nuclei, 'minc'].values[0]
         maxr = centroidLabelDF_Projection.loc[centroidLabelDF_Projection['label'] == nuclei, 'maxr'].values[0]
@@ -270,27 +271,148 @@ def createMask(timep, movieFile, filename, liveCellModel):
     return 1  # return completed frame index
 
     
+def get_centroid_lists(noNucleiFinal, centroidLabelDF_tCorr, centroidLabelDF_Projection):
+    """
+    Build centroid lists for projection and frame t.
+
+    Args:
+        noNucleiFinal (ndarray): Final list of nucleus labels.
+        centroidLabelDF_tCorr (DataFrame): Corrected nuclei DataFrame for frame t.
+        centroidLabelDF_Projection (DataFrame): Projection DataFrame with centroids.
+
+    Returns:
+        centroidListProjection (ndarray): [y, x, label] for projection centroids.
+        centroidListTPoint (ndarray): [y, x, label] for frame t centroids.
+    """
+    centroidListProjection = []
+    centroidListTPoint = []
+
+    for kk in noNucleiFinal:
+        # extract corrected t-frame centroid
+        y = centroidLabelDF_tCorr.loc[centroidLabelDF_tCorr['label'] == kk, 'x'].values[0]
+        x = centroidLabelDF_tCorr.loc[centroidLabelDF_tCorr['label'] == kk, 'y'].values[0]
+        nuc = centroidLabelDF_tCorr.loc[centroidLabelDF_tCorr['label'] == kk, 'label'].values[0]
+
+        # match to projection centroid
+        y00 = centroidLabelDF_Projection.loc[centroidLabelDF_Projection['label'] == nuc, 'x'].values[0]
+        x00 = centroidLabelDF_Projection.loc[centroidLabelDF_Projection['label'] == nuc, 'y'].values[0]
+
+        centroidListProjection.append([y00, x00, nuc])
+        centroidListTPoint.append([y, x, nuc])
+
+    return np.array(centroidListProjection), np.array(centroidListTPoint)
+
+
+def process_frame_mask(
+    tempmaskFolder,
+    imageName,
+    timep,
+    new_Proj_label,
+    centroidLabelDF_Projection,
+    remove_edge_masks,
+    match_nuc_cell,
+    getCentroidAndOrientationImage,
+    makeParameterDf,
+):
+    """
+    Process mask for frame t, match nuclei to projection, relabel mismatches.
+
+    Args:
+        tempmaskFolder (str): Folder containing temporary masks.
+        imageName (str): Name of the image file.
+        timep (int): Frame index.
+        new_Proj_label (ndarray): Projection label image.
+        centroidLabelDF_Projection (DataFrame): Projection centroids & labels.
+        remove_edge_masks (function): Function to remove edge masks.
+        match_nuc_cell (function): Function to match nuclei with projection.
+        getCentroidAndOrientationImage (function): Extract centroids/orientations.
+        makeParameterDf (function): Convert centroid/orientation data to DataFrame.
+
+    Returns:
+        centroidLabelDF_tCorr (DataFrame): Corrected nuclei info for frame t.
+        centroidLabelDF_pCorr (DataFrame): Corrected projection info.
+        noNucleiFinal (ndarray): Final list of unique nucleus labels.
+    """
+
+        
+    # Load mask path for frame t
+    maskPathHome = os.path.join(tempmaskFolder, imageName.replace('.', '_')) + f"_t{timep:03}_cp_masks.png"
+    if not os.path.isfile(maskPathHome):
+        return None, None, None
+
+
+    imageMaskt = imread(maskPathHome)
+    labelImaget = label(imageMaskt)
+    new_t_label = remove_edge_masks(labelImaget, change_index=True)
+
+
+    ## Match  nucleus at frame t to projection.
+
+    newLablet, newLableAll = match_nuc_cell(new_t_label, new_Proj_label, single_nuc=True, cell_alone=False)
+
+    noNucleiAfterMatch = np.unique(newLableAll)
+    noNucleiAfterMatch = np.delete(noNucleiAfterMatch,np.where(noNucleiAfterMatch == 0))
+
+    if noNucleiAfterMatch.size == 0:
+        return None, None, None
+
+    # Compute centroids
+
+    test_t = getCentroidAndOrientationImage(newLablet)
+    test_p = getCentroidAndOrientationImage(newLableAll)
+
+    centroidLabelDF_t = makeParameterDf(test_t)
+    centroidLabelDF_p = makeParameterDf(test_p)
+
+    # Add newLabel column
+    centroidLabelDF_p['newLabel'] = 0
+    centroidLabelDF_t['newLabel'] = 0
+
+    # Assign new labels based on nearest centroid in projection
+    for iii in range(len(centroidLabelDF_p)):
+        dist = (centroidLabelDF_Projection['x']-centroidLabelDF_p['x'][iii])**2+(centroidLabelDF_Projection['y']-centroidLabelDF_p['y'][iii])**2
+        newLabel = centroidLabelDF_Projection.iloc[np.argmin(dist)]['label']
+        centroidLabelDF_p.iloc[iii,9] = newLabel
+        idxs = np.where(centroidLabelDF_t.iloc[:,2]==centroidLabelDF_p['label'][iii])[0][0]
+        centroidLabelDF_t.iloc[idxs,9] = newLabel
+
+    #---------------------- Find Mismatch and Relabel -------------------------#
+
+    ## Relabel Mismatched Nuclei
+
+    mismatches = centroidLabelDF_t[centroidLabelDF_t.iloc[:,2]!=centroidLabelDF_t.iloc[:,9]]
+    mismatchesp = centroidLabelDF_p[centroidLabelDF_p.iloc[:,2]!=centroidLabelDF_p.iloc[:,9]]
+
+
+    # Relabel mismatched nuclei
+
+    for ff, ffp in zip(mismatches.index, mismatchesp.index):
+        newLablet[np.where(newLablet == centroidLabelDF_t.iloc[ff,2])] *=-1
+        newLableAll[np.where(newLableAll == centroidLabelDF_t.iloc[ff,2])] *=-1
+
+    # assign correct labels
+
+    for ff, ffp in zip(mismatches.index, mismatchesp.index):
+        newLablet[np.where(newLablet == centroidLabelDF_t.iloc[ff,2]*-1)] = centroidLabelDF_t.iloc[ff,9]
+        newLableAll[np.where(newLableAll == centroidLabelDF_p.iloc[ffp,2]*-1)] = centroidLabelDF_p.iloc[ffp,9]
+
+    # Get final nuclei list
+    noNucleiFinal = np.unique(newLableAll)
+    noNucleiFinal = np.delete(noNucleiFinal,np.where(noNucleiFinal == 0))
+
+    # Corrected centroid data
+    test_tCorr = getCentroidAndOrientationImage(newLablet)
+    test_pCorr = getCentroidAndOrientationImage(newLableAll)
+
+    centroidLabelDF_tCorr = makeParameterDf(test_tCorr)
+    centroidLabelDF_pCorr = makeParameterDf(test_pCorr)
+
+
+    return centroidLabelDF_tCorr, centroidLabelDF_pCorr, noNucleiFinal
 
 # ------------------- Worker Threads ------------------- #
 
-# class MaskCreationThread(QThread):
-#     progress = pyqtSignal(int)
-#     finished = pyqtSignal()
 
-#     def __init__(self, liveCellModel, movieFile, filename):
-#         super().__init__()
-#         self.liveCellModel = liveCellModel
-#         self.movieFile = movieFile
-#         self.filename = filename
-
-#     def run(self):
-#         total_frames = len(self.movieFile)
-#         for t, frame in enumerate(self.movieFile):
-#             imgs = np.max(frame, axis=0)
-#             masks, flows, styles = self.liveCellModel.eval(imgs, diameter=None, channels=[[0,0]])
-#             save_to_png(imgs, masks, flows, f"{self.filename}_t{t:03}")
-#             self.progress.emit(int((t+1)/total_frames*100))
-#         self.finished.emit()
 class MaskCreationThread(QThread):
     progress = pyqtSignal(int)
     finished = pyqtSignal()
@@ -309,12 +431,13 @@ class MaskCreationThread(QThread):
         # Run jobs in parallel, collect completed indices
         results = Parallel(n_jobs=self.n_jobs)(
             delayed(createMask)(timep, self.movieFile, self.filename, self.liveCellModel)
-            for timep in range(total_frames)
+            for timep in tqdm(range(total_frames))
         )
 
         # Update progress in order after completion
         for i, _ in enumerate(results, 1):
             self.completed = i
+            print(self.completed)
             self.progress.emit(int(self.completed / total_frames * 100))
 
         self.finished.emit()
@@ -362,7 +485,7 @@ class MainProcessThread(QThread):
                 else:
                     # ------------------ Process masks for each frame ------------------ #
                     tempmaskFolder = os.path.join(moviePath, 'tempMasks')
-                    centroidLabelDF_tCorr, centroidLabelDF_pCorr, noNucleiFinal = process_frame_mask(
+                    centroidLabelDF_tCorr, centroidLabelDF_pCorr, finalList = process_frame_mask(
                         tempmaskFolder,
                         imageName,
                         t,
@@ -373,9 +496,9 @@ class MainProcessThread(QThread):
                         getCentroidAndOrientationImage,
                         makeParameterDf
                     )
-                    if noNucleiFinal is None:
+                    if finalList is None:
                         continue  # Skip empty frames
-                    finalList = noNucleiFinal
+                    # finalList = noNucleiFinal
 
                     # ------------------ Get centroid lists for cropping ------------------ #
                     centroidListProjection, centroidListTPoint = get_centroid_lists(finalList, centroidLabelDF_tCorr, centroidLabelDF_Projection)
@@ -468,19 +591,19 @@ class App(QMainWindow):
             QMessageBox.warning(self, "Warning", "Load model and sessions first!")
             return
         
-        # # Ask user for number of threads
-        # n_jobs, ok = QInputDialog.getInt(
-        #     self,
-        #     "Set Number of Threads",
-        #     "Enter number of parallel threads:",
-        #     value=self.n_jobs,  # default
-        #     min=1,
-        #     max=64
-        # )
+        # Ask user for number of threads
+        n_jobs, ok = QInputDialog.getInt(
+            self,
+            "Set Number of Threads",
+            "Enter number of parallel threads:",
+            value=self.n_jobs,  # default
+            min=1,
+            max=64
+        )
         
-        # if not ok:
-        #     return  # user cancelled
-        # self.n_jobs = n_jobs  # save chosen value
+        if not ok:
+            return  # user cancelled
+        self.n_jobs = n_jobs  # save chosen value
 
         for session in self.sessionNames:
             moviePath = session
