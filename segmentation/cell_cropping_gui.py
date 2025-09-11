@@ -511,7 +511,8 @@ class MainProcessThread(QThread):
                 )
 
                 # ------------------ Update progress ------------------ #
-                self.progress.emit(int(((s_idx + t/len(movieFile)) / total_sessions) * 100))
+
+                self.progress.emit(int(((s_idx + t/(len(movieFile)-1)) / total_sessions) * 100))
 
         self.finished.emit()
 
@@ -522,7 +523,7 @@ class MainProcessThread(QThread):
 class App(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Cell Segmentation GUI")
+        self.setWindowTitle("Cell Cropping GUI")
         self.setGeometry(100, 100, 400, 300)
         
         self.liveCellModel = None
@@ -538,7 +539,7 @@ class App(QMainWindow):
         self.label = QLabel("Select an action:")
         layout.addWidget(self.label)
 
-        self.btnLoadModel = QPushButton("Load liveCellModel")
+        self.btnLoadModel = QPushButton("Load cellPose model")
         self.btnLoadModel.clicked.connect(self.load_liveCellModel)
         layout.addWidget(self.btnLoadModel)
 
@@ -554,7 +555,7 @@ class App(QMainWindow):
         self.btnToggleProjection.clicked.connect(self.toggle_projection)
         layout.addWidget(self.btnToggleProjection)
 
-        self.btnRunProcess = QPushButton("Run Main Process")
+        self.btnRunProcess = QPushButton("Run Cropping Process")
         self.btnRunProcess.clicked.connect(self.run_main_process)
         layout.addWidget(self.btnRunProcess)
 
@@ -583,7 +584,7 @@ class App(QMainWindow):
             self.sessionNames = [os.path.join(self.homeFolder, i) for i in os.listdir(self.homeFolder)
                                  if self.identifier in i and os.path.isdir(os.path.join(self.homeFolder, i))]
             self.sessionNames.sort()
-            QMessageBox.information(self, "Sessions Loaded", f"{len(self.sessionNames)} sessions found.")
+            QMessageBox.information(self, "Sessions Loaded", f"{len(self.sessionNames)} FOVs found.")
 
     def create_masks(self):
         if not self.liveCellModel or not self.sessionNames:
