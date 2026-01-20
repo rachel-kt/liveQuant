@@ -219,3 +219,192 @@ If you want, I can also:
 * Rewrite it as a **methods section for a paper**
 * Produce a **short “quick-start” version**
 
+
+# Manual and Explanation: Interactive Mask Generation and Segmentation (Napari + Big-FISH)
+
+## Overview
+
+This notebook implements an **interactive Napari-based GUI** for **image segmentation and mask generation** using the **Big-FISH** library and `scikit-image`.
+It is designed to process **single multi-dimensional microscopy files** (e.g. `.tif`) identified by a naming convention (`blur_`) and to generate, visualize, and persist **segmentation masks** (e.g. transcription site or region masks).
+
+The workflow supports:
+
+* Interactive file selection
+* Image visualization (full stack and projection)
+* Threshold-based segmentation
+* Morphological refinement
+* Mask reuse and persistence
+
+---
+
+## Dependencies and Initialization
+
+### Core Libraries
+
+* **Numerical & data handling:** `numpy`, `pandas`
+* **Visualization:** `napari`, `matplotlib`
+* **Image I/O:** `tifffile`, `dask.image.imread`, `imaris_ims_file_reader`
+* **Segmentation & morphology:** `bigfish.segmentation`, `bigfish.stack`, `skimage`
+
+### GUI Framework
+
+* **magicgui** for interactive widgets
+* **napari** for real-time image and label visualization
+
+### Version Logging
+
+The notebook prints Big-FISH and NumPy versions to ensure environment consistency.
+
+---
+
+## Global Configuration
+
+| Variable                        | Purpose                                                      |
+| ------------------------------- | ------------------------------------------------------------ |
+| `mIdentifier`                   | Filename prefix used to identify valid image files (`blur_`) |
+| `VOXEL_RADIUS`, `OBJECT_RADIUS` | Reserved for future physical calibration                     |
+| `DEFAULT_CHOICES`               | Initial dropdown placeholder                                 |
+| `SET_TABLE`, `CELL_CHOICE`      | GUI state tracking                                           |
+| `DEBUG`                         | Enables verbose logging                                      |
+
+---
+
+## GUI Workflow (User Manual)
+
+### 1. Choose Home Folder
+
+**Widget:** `choose_home_folder`
+
+* Select a directory containing `.tif` files.
+* Files are filtered by:
+
+  * Prefix defined by `mIdentifier`
+  * Must be a file (not a directory)
+
+The dropdown is automatically populated with valid image files.
+
+---
+
+### 2. Select Image File
+
+Triggered automatically upon dropdown selection.
+
+* Updates internal state to track the active file.
+* Associates the selected image with existing threshold metadata if available.
+* Displays a warning if expected threshold information is missing.
+
+---
+
+### 3. Load Image
+
+**Widgets:** `getFolderName` → `showMovie`
+
+Once a file is selected:
+
+* The image is loaded using Dask for efficiency.
+* Two layers are displayed in Napari:
+
+  * **Maximum intensity projection** (`stackCell`)
+  * **Full image stack** (`full`)
+
+This allows both overview inspection and detailed exploration.
+
+---
+
+### 4. Segment Image and Generate Mask
+
+**Widget:** `process_image`
+
+This is the core segmentation step.
+
+#### User-controlled parameters:
+
+* **Threshold:** Intensity cutoff for segmentation
+* **Kernel size (dilation):** Expands segmented regions
+* **Kernel size (erosion):** Refines boundaries
+* **Smoothness:** Controls boundary regularization
+
+#### Processing pipeline:
+
+1. Intensity thresholding
+2. Removal of small artifacts
+3. Morphological erosion
+4. Morphological dilation
+5. Instance labeling
+6. Boundary smoothing
+
+#### Mask reuse:
+
+* If a mask already exists on disk, it is loaded instead of recomputed.
+
+**Output:**
+A labeled mask layer displayed in Napari.
+
+---
+
+### 5. Save Mask to Disk
+
+**Widget:** `saveMask`
+
+* Saves the segmentation mask as a NumPy array.
+* Output directory:
+
+  ```
+  <parent_folder>/masks_tx/
+  ```
+* File name matches the original image name.
+
+This enables reproducible downstream analysis without re-segmentation.
+
+---
+
+### 6. Reset Controls
+
+| Button                | Action                             |
+| --------------------- | ---------------------------------- |
+| **Analyse new cell**  | Clears all viewer layers           |
+| **Analyse new movie** | Clears layers and resets GUI state |
+
+---
+
+## Expected Directory Structure
+
+```
+project_root/
+├── images/
+│   ├── blur_001.tif
+│   ├── blur_002.tif
+│   └── ...
+├── masks_tx/
+│   ├── blur_001.npy
+│   └── blur_002.npy
+```
+
+---
+
+## Intended Use Case
+
+This notebook is intended for:
+
+* Interactive mask generation
+* Rapid parameter tuning for segmentation
+* Manual quality control
+* Preprocessing prior to quantitative spot analysis
+
+It is optimized for **human-in-the-loop segmentation**, not batch automation.
+
+---
+
+## Summary
+
+This notebook provides a robust, GUI-driven segmentation workflow that integrates Big-FISH morphology tools with Napari’s interactive visualization. It emphasizes reproducibility, visual validation, and efficient reuse of segmentation results.
+
+---
+
+If you would like, I can also:
+
+* Produce a **short quick-start guide**
+* Convert this into a **README.md**
+* Add a **parameter tuning guide**
+* Align terminology with your **detection notebook** for consistency
+
