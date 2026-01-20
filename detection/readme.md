@@ -2,7 +2,7 @@
 
 ## Overview
 
-This notebook implements an **interactive GUI-based pipeline** for detecting RNA spots in time-lapse 3D microscopy data using **Napari** and the **Big-FISH** library.
+The notebook **0.0-getThreshold&Spots-GUI.ipynb** implements an **interactive GUI-based pipeline** for detecting RNA spots in time-lapse 3D microscopy data using **Napari** and the **Big-FISH** library.
 The workflow allows a user to:
 
 1. Select a cell dataset from disk
