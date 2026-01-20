@@ -1,4 +1,4 @@
-# Manual and Explanation: Interactive Spot Detection and Threshold Estimation (Napari + Big-FISH)
+# Interactive Spot Detection and Threshold Estimation (Napari + Big-FISH)
 
 ## Overview
 
@@ -220,7 +220,7 @@ If you want, I can also:
 * Produce a **short “quick-start” version**
 
 
-# Manual and Explanation: Interactive Mask Generation and Segmentation (Napari + Big-FISH)
+# Interactive Mask Generation and Segmentation (Napari + Big-FISH)
 
 ## Overview
 
